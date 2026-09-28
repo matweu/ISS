@@ -1,0 +1,17 @@
+numeric__battery_power
+numeric__px_height
+numeric__px_width
+numeric__ram
+numeric__pixel_area
+polynomial__ram
+polynomial__battery_power
+polynomial__pixel_area
+polynomial__ram^2
+polynomial__ram battery_power
+polynomial__ram pixel_area
+polynomial__battery_power^2
+polynomial__battery_power pixel_area
+polynomial__pixel_area^2
+bins__ram
+bins__battery_power
+bins__pixel_area

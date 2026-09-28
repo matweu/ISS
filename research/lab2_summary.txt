@@ -1,0 +1,18 @@
+Лабораторная работа №2
+
+Результаты экспериментов:
+              model  precision  recall     f1  roc_auc
+             optuna     0.9568  0.9560 0.9558   0.9965
+feature_engineering     0.9528  0.9517 0.9514   0.9963
+  feature_selection     0.9478  0.9473 0.9469   0.9961
+           baseline     0.8710  0.8725 0.8699   0.9809
+
+Лучшая модель: optuna
+Production run_id: d804173f8a1949c99c5538419e7cccca
+Production version: 3
+
+Production parameters:
+source_model: optuna
+n_estimators: 137
+max_depth: 17
+max_features: 0.19570087435374373

@@ -1,0 +1,5 @@
+              model  precision   recall       f1  roc_auc
+             optuna   0.956836 0.956024 0.955803 0.996523
+feature_engineering   0.952783 0.951657 0.951444 0.996299
+  feature_selection   0.947793 0.947309 0.946939 0.996079
+           baseline   0.870978 0.872495 0.869875 0.980858

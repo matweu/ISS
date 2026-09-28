@@ -1,0 +1,43 @@
+artifact_path: model
+flavors:
+  python_function:
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.sklearn
+    model_path: model.pkl
+    predict_fn: predict
+    python_version: 3.10.12
+  sklearn:
+    code: null
+    pickled_model: model.pkl
+    serialization_format: cloudpickle
+    sklearn_version: 1.7.2
+mlflow_version: 2.16.0
+model_size_bytes: 3710915
+model_uuid: c23572838068415586caffee4c5cd2e4
+run_id: d804173f8a1949c99c5538419e7cccca
+saved_input_example_info:
+  artifact_path: input_example.json
+  pandas_orient: split
+  serving_input_path: serving_input_example.json
+  type: dataframe
+signature:
+  inputs: '[{"type": "long", "name": "battery_power", "required": true}, {"type":
+    "integer", "name": "blue", "required": true}, {"type": "double", "name": "clock_speed",
+    "required": true}, {"type": "integer", "name": "dual_sim", "required": true},
+    {"type": "long", "name": "fc", "required": true}, {"type": "integer", "name":
+    "four_g", "required": true}, {"type": "long", "name": "int_memory", "required":
+    true}, {"type": "double", "name": "m_dep", "required": true}, {"type": "long",
+    "name": "mobile_wt", "required": true}, {"type": "long", "name": "n_cores", "required":
+    true}, {"type": "long", "name": "pc", "required": true}, {"type": "long", "name":
+    "px_height", "required": true}, {"type": "long", "name": "px_width", "required":
+    true}, {"type": "long", "name": "ram", "required": true}, {"type": "long", "name":
+    "sc_h", "required": true}, {"type": "long", "name": "sc_w", "required": true},
+    {"type": "long", "name": "talk_time", "required": true}, {"type": "integer", "name":
+    "three_g", "required": true}, {"type": "integer", "name": "touch_screen", "required":
+    true}, {"type": "integer", "name": "wifi", "required": true}, {"type": "long",
+    "name": "pixel_area", "required": true}]'
+  outputs: '[{"type": "tensor", "tensor-spec": {"dtype": "int64", "shape": [-1]}}]'
+  params: null
+utc_time_created: '2026-09-28 23:23:37.627134'

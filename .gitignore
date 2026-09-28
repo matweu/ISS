@@ -9,3 +9,9 @@ __pycache__/
 .ipynb_checkpoints/
 
 .vscode/
+
+mlflow/mlartifacts/
+mlflow/mlruns.db
+mlruns.db
+
+
