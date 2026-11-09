@@ -702,13 +702,13 @@ sum(rate(http_requests_total{path="/api/prediction"}[1m])) * 60
 # Запрос A: ошибки 4xx
 sum(increase(http_requests_total{path="/api/prediction",status=~"4.."}[5m])) or vector(0)
 ```
-
+![Ошибки 4x HTTP](services/prometheus/screenshots/http_errors4x.png)
 ```promql
 # Запрос B: ошибки 5xx
 sum(increase(http_requests_total{path="/api/prediction",status=~"5.."}[5m])) or vector(0)
 ```
 
-![Ошибки HTTP](services/prometheus/screenshots/http_errors.png)
+![Ошибки 5x HTTP](services/prometheus/screenshots/http_errors5x.png)
 
 Для проверки учёта ошибок валидации можно отправить некорректный запрос:
 
@@ -737,7 +737,8 @@ FastAPI должен вернуть HTTP 422 (отсутствуют обяза�
 | **Input RAM Above 3072 MB** | Данные модели | Доля запросов с `ram > 3072`, позволяющая заметить изменение состава входных данных |
 | **Prediction Histogram** | Модель | Накопительное распределение предсказаний в корзинах Histogram |
 
-![Дашборд Grafana](services/grafana/screenshots/dashboard.png)
+![Дашборд Grafana](services/grafana/screenshots/dash1.png)
+![Дашборд Grafana](services/grafana/screenshots/dash2.png)
 
 Для графика **Predictions by Price Range** используется запрос:
 
