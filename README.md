@@ -1,6 +1,21 @@
 # Mobile Price Classification
 
-Лабораторная работа №1 — настройка окружения и разведочный анализ данных.
+Проект машинного обучения для классификации мобильных телефонов по четырём ценовым категориям (`price_range`: 0–3). Он охватывает разведочный анализ данных, подготовку признаков, обучение и оценку моделей, эксперименты с MLflow, создание REST API на FastAPI и мониторинг контейнеризованного сервиса.
+
+**Технологии:** Python, Pandas, NumPy, scikit-learn, Optuna, MLflow, FastAPI, Uvicorn, Docker, Docker Compose, Prometheus, Prometheus Python Client, Grafana. Для исследования и визуализации данных использовались Jupyter Notebook и графические библиотеки из предыдущих лабораторных работ.
+
+## Этапы проекта
+
+- **ЛР1:** настройка окружения, разведочный анализ данных и подготовка датасета.
+- **ЛР2:** Feature Engineering, отбор признаков, подбор параметров RandomForest и регистрация Production-модели в MLflow.
+- **ЛР3:** REST API для предсказаний, загрузка `model.pkl`, контейнеризация с Docker.
+- **ЛР4:** генерация тестовых запросов, экспорт метрик, Prometheus и дашборд Grafana.
+
+---
+
+# Лабораторная работа №1
+
+Настройка окружения и разведочный анализ данных.
 
 ## Описание проекта
 
@@ -484,3 +499,283 @@ docker run -d --name mobile-price-service -p 8000:8000 -v "$(pwd)/../models:/mod
 JSON с идентификатором объекта и его ценовой категорией.
 
 Сервис можно запускать как локально с Uvicorn, так и в Docker-контейнере.
+
+---
+
+# Лабораторная работа №4
+
+## Доработка сервиса предсказаний. Мониторинг
+
+### Цель работы
+
+В четвёртой лабораторной работе сервис предсказания ценовой категории мобильного телефона был дополнен генератором тестовых запросов и системой мониторинга. Все компоненты объединены в Docker Compose. **Prometheus** собирает метрики работы API и модели, а **Grafana** отображает их на дашборде.
+
+Необязательная часть с PostgreSQL и pgAdmin в текущую конфигурацию не входит. Для демонстрации изменения входных данных предусмотрено изменение распределения признака `ram` в генераторе запросов.
+
+### Архитектура
+
+```text
+ data/train.csv
+      |
+      v
+ +------------------+        POST /api/prediction        +------------------+
+ | requests         | --------------------------------> | ml_service       |
+ | requests.py      |                                   | FastAPI + model  |
+ +------------------+                                   +------------------+
+                                                                |
+                                                                | GET /metrics
+                                                                v
+                                                        +------------------+
+                                                        | Prometheus       |
+                                                        | сбор метрик      |
+                                                        +------------------+
+                                                                |
+                                                                | PromQL
+                                                                v
+                                                        +------------------+
+                                                        | Grafana          |
+                                                        | дашборд          |
+                                                        +------------------+
+```
+
+Внутри Docker Compose сервисы обращаются друг к другу по именам (`ml_service`, `prometheus`), а не через `localhost`.
+
+### Структура файлов ЛР4
+
+```text
+services/
+├── compose.yml
+├── ml_service/
+│   ├── main.py
+│   ├── api_handler.py
+│   ├── monitoring.py
+│   ├── requirements.txt
+│   └── Dockerfile
+├── models/
+│   └── model.pkl
+├── requests/
+│   ├── requests.py
+│   ├── requirements.txt
+│   └── Dockerfile
+├── prometheus/
+│   ├── prometheus.yml
+│   └── screenshots/
+│       ├── predictions.png
+│       ├── request_rate.png
+│       └── http_errors.png
+└── grafana/
+    ├── dashboards/
+    │   └── mobile-price.json
+    ├── provisioning/
+    │   ├── datasources/
+    │   │   └── prometheus.yml
+    │   └── dashboards/
+    │       └── dashboard.yml
+    └── screenshots/
+        └── dashboard.png
+```
+
+Файлы `monitoring.py` и `prometheus.yml` отвечают соответственно за экспорт и сбор метрик. В `compose.yml` описаны контейнеры, их порты, зависимости и тома. Файл `grafana/dashboards/mobile-price.json` содержит экспорт дашборда, который можно хранить в Git и повторно импортировать. Конфигурации `grafana/provisioning/` позволяют автоматически подключать Prometheus и загружать сохранённый дашборд.
+
+Скриншоты из каталогов `screenshots/` нужно сохранить после запуска и проверки графиков: они не создаются автоматически командами Docker.
+
+### Генератор запросов
+
+Скрипт `services/requests/requests.py` выбирает случайный телефон из `data/train.csv`, формирует JSON с признаками и отправляет его в `POST /api/prediction` с параметром `item_id`. После каждого запроса программа ожидает случайное время от **0 до 5 секунд** и отправляет следующий запрос.
+
+Особенности генератора:
+
+- используются признаки реальных строк обучающего набора; целевая переменная `price_range` в запрос не включается;
+- признак `pixel_area` рассчитывается как `px_height * px_width`;
+- адрес API задаётся через `ML_SERVICE_URL`, путь к CSV — через `DATASET_PATH`;
+- используются модули стандартной библиотеки Python, поэтому файл `requests/requirements.txt` может быть пустым;
+- при `RAM_SHIFT_PROB=0` значения `ram` берутся из исходных строк; ненулевое значение параметра позволяет искусственно изменить распределение RAM и продемонстрировать возможный data shift.
+
+Для локального запуска генератора, когда FastAPI уже работает на порту 8000:
+
+```bash
+cd ~/ml_lab
+ML_SERVICE_URL=http://localhost:8000/api/prediction \
+DATASET_PATH="$PWD/data/train.csv" \
+python -u services/requests/requests.py
+```
+
+При запуске через Compose используется внутренний адрес `http://ml_service:8000/api/prediction`. Для остановки локального генератора используется `Ctrl+C`.
+
+### Docker Compose: сборка и запуск
+
+Для запуска требуется Docker с поддержкой `docker compose` (Compose V2). Перед стартом должны существовать файлы `data/train.csv` и `services/models/model.pkl`. Модель выгружается из MLflow по инструкции ЛР3; в Git она не хранится.
+
+Из корня проекта:
+
+```bash
+cd ~/ml_lab
+
+# Проверить конфигурацию
+sudo docker compose -f services/compose.yml config -q
+
+# Собрать образы и запустить все сервисы в фоне
+sudo docker compose -f services/compose.yml up -d --build
+
+# Проверить контейнеры
+sudo docker compose -f services/compose.yml ps
+
+# Посмотреть логи генератора
+sudo docker compose -f services/compose.yml logs -f requests
+
+# Посмотреть логи API
+sudo docker compose -f services/compose.yml logs -f ml_service
+
+# Остановить проект, сохранив тома с данными
+sudo docker compose -f services/compose.yml down
+```
+
+Перед запуском Compose необходимо остановить контейнер ЛР3, если он занимает порт 8000:
+
+```bash
+sudo docker rm -f mobile-price-service
+```
+
+В ЛР4 используется образ `mobile-price-service:2` (в ЛР3 — `mobile-price-service:1`). Для работы Prometheus и Grafana применяются официальные образы `prom/prometheus` и `grafana/grafana`.
+
+### Веб-интерфейсы и проверка
+
+| Компонент | Адрес | Назначение |
+| --- | --- | --- |
+| FastAPI | `http://localhost:8000` | Основной ML-сервис |
+| Swagger UI | `http://localhost:8000/docs` | Ручное тестирование API |
+| Метрики FastAPI | `http://localhost:8000/metrics` | Метрики в формате Prometheus |
+| Prometheus | `http://localhost:9090` | PromQL и графики |
+| Prometheus Targets | `http://localhost:9090/targets` | Проверка состояния сбора метрик |
+| Grafana | `http://localhost:3000` | Дашборд мониторинга |
+
+Для учебного экземпляра Grafana используются логин и пароль `admin` / `admin`. Такие учётные данные нельзя использовать для публично доступного сервиса.
+
+Проверить доступность API и экспорт метрик можно командами:
+
+```bash
+curl http://localhost:8000/
+curl -s http://localhost:8000/metrics | grep '^model_prediction_bucket'
+curl -s http://localhost:8000/metrics | grep '^http_requests_total'
+```
+
+В разделе **Targets** интерфейса Prometheus цель `ml_service:8000` должна иметь статус **UP**. Для этого в `services/prometheus/prometheus.yml` указывается адрес `ml_service:8000` и путь `/metrics`.
+
+### Метрики сервиса
+
+| Метрика | Тип | Что измеряет |
+| --- | --- | --- |
+| `model_prediction` | Histogram | Накопительное распределение предсказанных классов 0–3 |
+| `model_predictions_total` | Counter | Число предсказаний по отдельным классам (`price_range`) |
+| `http_requests_total` | Counter | Число запросов в разрезе метода, пути и HTTP-статуса |
+| `http_request_duration_seconds` | Histogram | Длительность обработки HTTP-запросов |
+| `model_input_ram` | Histogram | Распределение входного значения оперативной памяти |
+| `process_resident_memory_bytes` | Gauge | Использование оперативной памяти процессом Python |
+
+Для `model_prediction` используются границы `0`, `1`, `2`, `3`: результат классификатора является целым числом. В Prometheus гистограммы **накопительные**: корзина `le="2.0"` включает классы 0, 1 и 2. Корзина `+Inf` добавляется автоматически и охватывает все наблюдения. Её можно исключить **только из графика**, добавив фильтр `le!="+Inf"` в PromQL.
+
+Для наглядного сравнения **отдельных** классов используется `model_predictions_total`: в отличие от накопительной гистограммы, эта метрика сразу показывает число предсказаний 0, 1, 2 и 3 по отдельности.
+
+### Графики в Prometheus
+
+**1. Гистограмма предсказаний.** Показывает, как распределяются предсказания по накопительным корзинам за последние пять минут. Техническая корзина `+Inf` исключена из отображения:
+
+```promql
+sum by (le) (
+  increase(model_prediction_bucket{le!="+Inf"}[5m])
+)
+```
+
+![Гистограмма предсказаний](services/prometheus/screenshots/predictions.png)
+
+**2. Частота запросов в минуту.** Вычисляется по счётчику HTTP-запросов к основному endpoint:
+
+```promql
+sum(rate(http_requests_total{path="/api/prediction"}[1m])) * 60
+```
+
+![Частота запросов](services/prometheus/screenshots/request_rate.png)
+
+**3. Количество ошибок 4xx и 5xx.** На одном графике отображаются две линии, соответствующие количеству клиентских и серверных ошибок за последние пять минут:
+
+```promql
+# Запрос A: ошибки 4xx
+sum(increase(http_requests_total{path="/api/prediction",status=~"4.."}[5m])) or vector(0)
+```
+
+```promql
+# Запрос B: ошибки 5xx
+sum(increase(http_requests_total{path="/api/prediction",status=~"5.."}[5m])) or vector(0)
+```
+
+![Ошибки HTTP](services/prometheus/screenshots/http_errors.png)
+
+Для проверки учёта ошибок валидации можно отправить некорректный запрос:
+
+```bash
+curl -i -X POST \
+  'http://localhost:8000/api/prediction?item_id=999' \
+  -H 'Content-Type: application/json' \
+  -d '{}'
+```
+
+FastAPI должен вернуть HTTP 422 (отсутствуют обязательные поля). Ошибки 5xx возникают при сбоях на стороне сервера; специально провоцировать их для демонстрации не требуется. Величина `increase()` может быть дробной из-за экстраполяции показаний Prometheus.
+
+### Дашборд Grafana
+
+В Grafana настроен источник данных **Prometheus** с внутренним адресом `http://prometheus:9090`. Конфигурация дашборда хранится в `services/grafana/dashboards/mobile-price.json`.
+
+Дашборд включает семь графиков:
+
+| График | Уровень | Описание |
+| --- | --- | --- |
+| **API Requests per Minute** | Прикладной | Интенсивность поступления запросов к `/api/prediction` в минуту |
+| **HTTP Errors** | Прикладной | Число ответов с ошибками 4xx и 5xx за пятиминутный интервал |
+| **Predictions by Price Range** | Модель | Количество предсказаний по классам 0, 1, 2 и 3 по отдельности |
+| **API Response Time P95** | Производительность | Оценка 95-го процентиля времени ответа API |
+| **ML Service Memory Usage** | Инфраструктурный | Объём оперативной памяти, занятой процессом ML-сервиса |
+| **Input RAM Above 3072 MB** | Данные модели | Доля запросов с `ram > 3072`, позволяющая заметить изменение состава входных данных |
+| **Prediction Histogram** | Модель | Накопительное распределение предсказаний в корзинах Histogram |
+
+![Дашборд Grafana](services/grafana/screenshots/dashboard.png)
+
+Для графика **Predictions by Price Range** используется запрос:
+
+```promql
+sum by (price_range) (
+  increase(model_predictions_total[5m])
+)
+```
+
+Это позволяет показывать независимые классы, а не вычитать значения накопительных корзин. Классы модели имеют номера **0–3**, а не 1–4.
+
+Время ответа P95 вычисляется следующим образом:
+
+```promql
+histogram_quantile(
+  0.95,
+  sum by (le) (
+    rate(http_request_duration_seconds_bucket{path="/api/prediction"}[5m])
+  )
+)
+```
+
+Для демонстрации возможного изменения распределения входных данных можно временно включить изменение RAM у части тестовых запросов:
+
+```bash
+cd ~/ml_lab
+RAM_SHIFT_PROB=0.8 sudo -E docker compose -f services/compose.yml up -d --force-recreate requests
+```
+
+После наблюдения графиков обычный режим возвращается командой:
+
+```bash
+sudo docker compose -f services/compose.yml up -d --force-recreate requests
+```
+
+При использовании этого режима необходимо проверить, что переменная `RAM_SHIFT_PROB` действительно передаётся в контейнер через `compose.yml`. При `0.8` примерно 80% запросов будут содержать искусственно увеличенное значение RAM. Изменение графика — **признак возможного data shift**, но не доказательство снижения качества модели. Для полноценного контроля качества нужны истинные метки классов и сравнение с эталонным распределением обучающей выборки.
+
+### Результат ЛР4
+
+Разработан составной сервис из генератора запросов, FastAPI, Prometheus и Grafana. Тестовые данные автоматически поступают в API, а показатели нагрузки, ошибок, времени ответа, распределения предсказаний и ресурсов процесса отображаются в системе мониторинга. Конфигурация контейнеров и файл дашборда подготовлены для хранения в Git.
+
