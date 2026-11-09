@@ -1,0 +1,90 @@
+services:
+
+  ml_service:
+    build:
+      context: ./ml_service
+
+    image: mobile-price-service:2
+
+    ports:
+      - "8000:8000"
+
+    volumes:
+      - ./models:/models:ro
+
+    restart: unless-stopped
+
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/', timeout=3)"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+
+  requests:
+    build:
+      context: ./requests
+
+    image: mobile-price-requests:1
+
+    environment:
+      ML_SERVICE_URL: http://ml_service:8000/api/prediction
+      DATASET_PATH: /app/train.csv
+      RAM_SHIFT_PROB: ${RAM_SHIFT_PROB:-0}
+
+    volumes:
+      - ../data/train.csv:/app/train.csv:ro
+
+    depends_on:
+      ml_service:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+
+  prometheus:
+    image: prom/prometheus:latest
+
+    ports:
+      - "9090:9090"
+
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+
+    depends_on:
+      ml_service:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+
+  grafana:
+    image: grafana/grafana:latest
+
+    ports:
+      - "3000:3000"
+
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
+
+    depends_on:
+      - prometheus
+
+    restart: unless-stopped
+
+
+volumes:
+  prometheus_data:
+  grafana_data:
